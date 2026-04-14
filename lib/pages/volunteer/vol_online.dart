@@ -132,11 +132,11 @@ class VolunteerOnline extends StatelessWidget {
                   mainAxisSpacing: 16,
                   childAspectRatio: 0.85,
                   children: [
-                    buildCard(context,"Programming", "images/programming.jpg"),
-                    buildCard(context,"Design", "images/design.jpg"),
-                    buildCard(context,"Translation", "images/transaltion.jpg"),
-                    buildCard(context,"Consultation", "images/consultation.jpg"),
-                    buildCard(context,"Others", "images/others.jpg"),
+                    buildCard(context,6,"Programming", "images/programming.jpg"),
+                    buildCard(context,7,"Design", "images/design.jpg"),
+                    buildCard(context,8,"Translation", "images/transaltion.jpg"),
+                    buildCard(context,9,"Consultation", "images/consultation.jpg"),
+                    buildCard(context,10,"Others", "images/others.jpg"),
                   ],
                 ),
               ),
@@ -147,14 +147,16 @@ class VolunteerOnline extends StatelessWidget {
     );
   }
 
-  Widget buildCard(BuildContext context, String title, String image) {
+  Widget buildCard(BuildContext context,int id, String title, String image) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => RequestsScreen(
-              serviceType: title,
+              categoryId: id,
+              categoryName: title,
+                serviceType: "offer"
             ),
           ),
         );

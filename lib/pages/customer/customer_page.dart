@@ -121,7 +121,7 @@ class _CustomerPageState extends State<CustomerPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const CustomerOfffline(),
+                          builder: (context) => const CustomerOffline(),
                         ),
                       );
                     },

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'pages/Home.dart';
 import 'pages/profile pages/profile_screen.dart';
 import 'pages/profile pages/updateprofile.dart';
-import 'Log & Reg.dart';
+import 'log & reg/Log & Reg.dart';
 import 'pages/contact us.dart';
 import 'pages/about us.dart';
 import 'pages/volunteer/volunteer_page.dart';
@@ -46,7 +46,7 @@ class _MyAppState extends State<MyApp> {
         brightness: isDark ? Brightness.dark : Brightness.light,
         primaryColor: mainGreen,
       ),
-      home:CustomerOnline(
+      home:LoginScreen(
           //serviceType: "Delivery"
           //isDark : isDark,
           //toggleTheme : toggleTheme

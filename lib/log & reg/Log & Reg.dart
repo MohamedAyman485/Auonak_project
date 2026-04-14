@@ -1,7 +1,11 @@
 import 'package:android/pages/Home.dart';
 import 'package:flutter/material.dart';
-import 'pages/Home.dart';
-
+import '../pages/Home.dart';
+import 'package:android/pages/php_services/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:android/log & reg/register_model.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 const Color mainGreen = Color(0xFF1ABC9C);
 
@@ -225,7 +229,9 @@ Widget stepScreen({
 //step 1 screen
 
 class Step1Screen extends StatefulWidget {
-  const Step1Screen({super.key});
+  final RegisterModel model;
+
+  const Step1Screen({super.key, required this.model});
 
   @override
   State<Step1Screen> createState() => _Step1ScreenState();
@@ -295,16 +301,23 @@ class _Step1ScreenState extends State<Step1Screen> {
             return;
           }
 
-          smoothNavigation(context, const Step2Screen());
+          widget.model.name = nameController.text;
+          widget.model.gender = gender;
+
+          smoothNavigation(
+            context,
+            Step2Screen(model: widget.model),
+          );
         },
     );
   }
 }
 
 ///////////step 2 screen
-
 class Step2Screen extends StatefulWidget {
-  const Step2Screen({super.key});
+  final RegisterModel model;
+
+  const Step2Screen({super.key, required this.model});
 
   @override
   State<Step2Screen> createState() => _Step2ScreenState();
@@ -345,7 +358,15 @@ class _Step2ScreenState extends State<Step2Screen> {
     });
 
     if (!countryError && !regionError && !streetError) {
-      smoothNavigation(context, const Step3Screen());
+      // 👇 تخزين البيانات
+      widget.model.country = selectedCountry;
+      widget.model.city = regionController.text;
+      widget.model.street = streetController.text;
+
+      // 👇 الانتقال للخطوة التالية
+      smoothNavigation(
+        context, Step3Screen(model: widget.model),
+      );
     }
   }
 
@@ -355,7 +376,6 @@ class _Step2ScreenState extends State<Step2Screen> {
       step: 2,
       context: context,
       fields: [
-        // Country Dropdown
         DropdownButtonFormField<String>(
           value: selectedCountry,
           decoration: InputDecoration(
@@ -377,7 +397,6 @@ class _Step2ScreenState extends State<Step2Screen> {
         ),
         const SizedBox(height: 10),
 
-        // Region / City
         TextField(
           controller: regionController,
           decoration: InputDecoration(
@@ -387,7 +406,6 @@ class _Step2ScreenState extends State<Step2Screen> {
         ),
         const SizedBox(height: 10),
 
-        // Street
         TextField(
           controller: streetController,
           decoration: InputDecoration(
@@ -396,14 +414,15 @@ class _Step2ScreenState extends State<Step2Screen> {
           ),
         ),
       ],
-      next: validateAndNext,
+      next: validateAndNext, // 👈 أهم سطر
     );
   }
 }
-
 ///////////step 3 screen
 class Step3Screen extends StatefulWidget {
-  const Step3Screen({super.key});
+  final RegisterModel model;
+
+  const Step3Screen({super.key, required this.model});
 
   @override
   State<Step3Screen> createState() => _Step3ScreenState();
@@ -452,9 +471,18 @@ class _Step3ScreenState extends State<Step3Screen> {
         confirmError = "Passwords do not match";
       }
 
-      // إذا كل حاجة صح نروح للخطوة التالية
+      // ✅ لو كله صح
       if (emailError == null && passwordError == null && confirmError == null) {
-        smoothNavigation(context, const Step4Screen());
+
+        // 👇 خزّن البيانات
+        widget.model.email = _emailController.text;
+        widget.model.password = _passwordController.text;
+
+        // 👇 روح للخطوة اللي بعدها
+        smoothNavigation(
+          context,
+          Step4Screen(model: widget.model),
+        );
       }
     });
   }
@@ -519,7 +547,9 @@ class _Step3ScreenState extends State<Step3Screen> {
 ///////////step 4 screen
 
 class Step4Screen extends StatefulWidget {
-  const Step4Screen({super.key});
+  final RegisterModel model;
+
+  const Step4Screen({super.key, required this.model});
 
   @override
   State<Step4Screen> createState() => _Step4ScreenState();
@@ -529,14 +559,59 @@ class _Step4ScreenState extends State<Step4Screen> {
   final TextEditingController phoneController = TextEditingController();
   bool phoneError = false;
 
-  void validateAndNext() {
+  void validateAndNext() async {
+    print("BUTTON CLICKED");
+
     setState(() {
       phoneError = phoneController.text.trim().isEmpty;
     });
 
-    if (!phoneError) {
-      // بعد ما يملأ الرقم ندخل على صفحة التحقق
-      smoothNavigation(context, VerificationScreen(phoneNumber: phoneController.text));
+    print("PHONE: ${phoneController.text}");
+
+    if (phoneError) return;
+
+    print("BEFORE REQUEST");
+
+    try {
+      var response = await http.post(
+        Uri.parse("http://10.0.2.2:8000/api/send-otp"),
+        headers: {
+          "Accept": "application/json",
+        },
+        body: {
+          "phone": phoneController.text,
+          "email": widget.model.email, // 👈 مهم جدًا
+        },
+      );
+
+      print("AFTER REQUEST ✅");
+
+      var data = jsonDecode(response.body);
+      print(data);
+
+      /// 🔥 الجزء المهم اللي ناقصك
+      if (response.statusCode == 200) {
+        print("GO TO OTP 🚀");
+
+        // خزّن الرقم
+        widget.model.phone = phoneController.text;
+
+        // روح لصفحة OTP
+        smoothNavigation(
+          context,
+          VerificationScreen(
+            phoneNumber: phoneController.text,
+            model: widget.model,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? "Error")),
+        );
+      }
+    } catch (e) {
+      print("ERROR ❌");
+      print(e);
     }
   }
 
@@ -551,7 +626,8 @@ class _Step4ScreenState extends State<Step4Screen> {
           keyboardType: TextInputType.phone,
           decoration: InputDecoration(
             labelText: "Phone Number",
-            errorText: phoneError ? "Please enter your phone number" : null,
+            errorText:
+            phoneError ? "Please enter your phone number" : null,
           ),
         ),
       ],
@@ -561,9 +637,16 @@ class _Step4ScreenState extends State<Step4Screen> {
 }
 
 ///////////verification screen
+
 class VerificationScreen extends StatefulWidget {
   final String phoneNumber;
-  const VerificationScreen({super.key, required this.phoneNumber});
+  final RegisterModel model;
+
+  const VerificationScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.model,
+  });
 
   @override
   State<VerificationScreen> createState() => _VerificationScreenState();
@@ -572,24 +655,104 @@ class VerificationScreen extends StatefulWidget {
 class _VerificationScreenState extends State<VerificationScreen> {
   final TextEditingController codeController = TextEditingController();
   bool codeError = false;
+  bool isLoading = false;
 
-  void validateCode() {
+  void validateCode() async {
     setState(() {
       codeError = codeController.text.trim().isEmpty;
     });
 
-    if (!codeError) {
-      // لو الكود موجود نروح على Home
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HomePage(
-            isDark: false,
-            toggleTheme: () {},
-          ),
-        ),
+    if (codeError) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      /// 1️⃣ verify OTP
+      var verifyResponse = await http.post(
+        Uri.parse("http://10.0.2.2:8000/api/verify-otp"),
+        headers: {
+          "Accept": "application/json",
+        },
+        body: {
+          "email": widget.model.email,
+          "otp": codeController.text,
+        },
+      );
+
+      print("VERIFY RAW: ${verifyResponse.body}");
+
+      if (verifyResponse.body.startsWith("<")) {
+        print("❌ HTML ERROR");
+        return;
+      }
+
+      var verifyData = jsonDecode(verifyResponse.body);
+      print("VERIFY: $verifyData");
+
+      if (verifyResponse.statusCode == 200) {
+        /// 2️⃣ register
+        var registerResponse = await http.post(
+          Uri.parse("http://10.0.2.2:8000/api/register"),
+          headers: {
+            "Accept": "application/json",
+          },
+          body: {
+            "name": widget.model.name,
+            "email": widget.model.email,
+            "password": widget.model.password,
+            "phone": widget.model.phone,
+            "gender": widget.model.gender,
+            "nationality": widget.model.country,
+            "city": widget.model.city,
+            "street": widget.model.street,
+          },
+        );
+
+        print("REGISTER RAW: ${registerResponse.body}");
+
+        if (registerResponse.body.startsWith("<")) {
+          print("❌ HTML ERROR IN REGISTER");
+          return;
+        }
+
+        var registerData = jsonDecode(registerResponse.body);
+        print("REGISTER: $registerData");
+
+        if (registerResponse.statusCode == 200) {
+          print("✅ REGISTER DONE");
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => HomePage(
+                isDark: false,
+                toggleTheme: () {},
+              ),
+            ),
+          );
+        }else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(registerData['message'] ?? "Register error")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(verifyData['message'] ?? "Invalid OTP")),
+        );
+      }
+    } catch (e) {
+      print(e);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Connection error")),
       );
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   @override
@@ -619,14 +782,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: validateCode,
+                  onPressed: isLoading ? null : validateCode,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: mainGreen,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text(
+                  child: isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
                     "Next",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style:
+                    TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ),
               ),
@@ -637,7 +803,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     );
   }
 }
-
 //////////////////////////////////////////////////////////////////////////////
 // LOGIN SCREEN
 //////////////////////////////////////////////////////////////////////////////
@@ -655,25 +820,40 @@ class _LoginScreenState extends State<LoginScreen> {
   String? emailError;
   String? passwordError;
 
-  void validateAndLogin() {
+  void validateAndLogin() async {
+    // ✅ الأول validation
     setState(() {
       emailError = null;
       passwordError = null;
 
-      // Email validation
       if (emailController.text.isEmpty) {
         emailError = "Email is required";
       } else if (!emailController.text.contains('@')) {
         emailError = "Email must contain @";
       }
 
-      // Password validation
       if (passwordController.text.isEmpty) {
         passwordError = "Password is required";
       }
+    });
 
-      // لو كل حاجة صح، نروح على الصفحة الرئيسية
-      if (emailError == null && passwordError == null) {
+    // ✅ بعد كده نكلم الـ API برا setState
+    if (emailError == null && passwordError == null) {
+      try {
+        var data = await ApiService.login(
+          emailController.text,
+          passwordController.text,
+        );
+
+        print(data);
+
+        var token = data['token'];
+
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', token);
+
+        print("TOKEN: $token");
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -683,8 +863,14 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         );
+      } catch (e) {
+        print(e.toString());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Login failed")),
+        );
       }
-    });
+    }
   }
 
   @override
@@ -741,7 +927,10 @@ class _LoginScreenState extends State<LoginScreen> {
               // Link to create account
               GestureDetector(
                 onTap: () {
-                  smoothNavigation(context, const Step1Screen());
+                  smoothNavigation(
+                    context,
+                    Step1Screen(model: RegisterModel()),
+                  );
                 },
                 child: const Text.rich(
                   TextSpan(

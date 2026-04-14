@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:android/pages/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddServicePage extends StatefulWidget {
   const AddServicePage({super.key});
@@ -29,6 +31,55 @@ class _AddServicePageState extends State<AddServicePage> {
     "Consultation",
   ];
 
+  //////////////////////////////////////////////////////
+  // ✅ API CALL (CREATE SERVICE)
+  //////////////////////////////////////////////////////
+  Future<void> createService() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+
+    /// 🔥 map category name → id
+    Map<String, int> categoryMap = {
+      "Programming": 6,
+      "Design": 7,
+      "Translation": 8,
+      "Consultation": 9,
+      "Others": 10,
+    };
+
+    int categoryId = categoryMap[selectedCategory] ?? 6;
+
+    var response = await http.post(
+      Uri.parse("http://10.0.2.2:8000/api/services"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: {
+        "name": titleController.text, // 🔥 بدل title
+        "description": descriptionController.text,
+        "category_id": categoryId.toString(), // 🔥 مهم
+        "type": serviceType == "Offer Service" ? "offer" : "request", // 🔥 مهم
+        "timesalary": "50", // 🔥 مؤقت (تقدر تعمله input بعدين)
+        "service_location": locationController.text,
+      },
+    );
+
+    print("STATUS: ${response.statusCode}");
+    print("BODY: ${response.body}");
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Service added successfully ✅")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error ❌: ${response.body}")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,6 +92,7 @@ class _AddServicePageState extends State<AddServicePage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+
             /// Service Name
             TextField(
               controller: titleController,
@@ -177,30 +229,20 @@ class _AddServicePageState extends State<AddServicePage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: () {
-                  if (titleController.text.isEmpty || selectedCategory == null) {
+                onPressed: () async {
+                  if (titleController.text.isEmpty ||
+                      selectedCategory == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("من فضلك املأ كل البيانات")),
+                      const SnackBar(
+                          content: Text("من فضلك املأ كل البيانات")),
                     );
                     return;
                   }
 
-                  // ✅ إضافة الطلب
-                  RequestStorage.requests.add(
-                    Request(
-                      title: titleController.text,
-                      description: descriptionController.text,
-                      time: timeController.text,
-                      location: locationController.text,
-                      type: selectedCategory!,
-                      serviceType: serviceType,// 🔥 دي أهم حاجة
-                    ),
-                  );
+                  await createService(); // ✅ API CALL
 
-                  // 🔙 رجوع للصفحة اللي فيها الطلبات
-                  Navigator.pop(context);
+                  Navigator.pop(context); // رجوع بعد النجاح
                 },
-
                 child: const Text(
                   "Submit",
                   style: TextStyle(fontSize: 16),

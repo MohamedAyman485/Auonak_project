@@ -1,19 +1,71 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:android/pages/add service.dart';
 import 'package:android/pages/services.dart';
-class CustomerOfffline extends StatelessWidget {
-  const CustomerOfffline({super.key});
+
+class CustomerOffline extends StatefulWidget {
+  const CustomerOffline({super.key});
+
+  @override
+  State<CustomerOffline> createState() => _CustomerOfflineState();
+}
+
+class _CustomerOfflineState extends State<CustomerOffline> {
+
+  List services = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchServices();
+  }
+
+  Future<void> fetchServices() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+
+    try {
+      var response = await http.get(
+        Uri.parse("http://10.0.2.2:8000/api/services"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Accept": "application/json",
+        },
+      );
+
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
+
+      if (response.statusCode == 200) {
+        List data = jsonDecode(response.body);
+
+        setState(() {
+          services = data.where((s) => s['type'] == 'offline').toList();
+          loading = false;
+        });
+      } else {
+        setState(() => loading = false);
+      }
+    } catch (e) {
+      print(e);
+      setState(() => loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      iconTheme: const IconThemeData(color: Colors.black),
-    ),
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
       backgroundColor: Colors.white,
 
-      /// 🔘 زرار الإضافة
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         onPressed: () {
@@ -28,10 +80,12 @@ class CustomerOfffline extends StatelessWidget {
       ),
 
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
           child: Column(
             children: [
-              /// 🔹 الجزء العلوي (صورة + كلام)
+
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Container(
@@ -48,7 +102,7 @@ class CustomerOfffline extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      /// الصورة
+
                       ClipRRect(
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(25),
@@ -61,39 +115,23 @@ class CustomerOfffline extends StatelessWidget {
                         ),
                       ),
 
-                      /// النص
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
+                          children: const [
+                            Text(
                               "Boost your business with offline services",
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
+                            SizedBox(height: 8),
+                            Text(
                               "Grow your business by offering real-world services and connecting directly with customers in your area.",
-                              style: TextStyle(
-                                color: Colors.grey,
-                              ),
+                              style: TextStyle(color: Colors.grey),
                             ),
-                            const SizedBox(height: 12),
-
-                            /// زرار
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[400],
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: () {},
-                              child: const Text("Explore Services"),
-                            )
                           ],
                         ),
                       )
@@ -104,7 +142,6 @@ class CustomerOfffline extends StatelessWidget {
 
               const SizedBox(height: 10),
 
-              /// 🔹 عنوان
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Align(
@@ -121,7 +158,6 @@ class CustomerOfffline extends StatelessWidget {
 
               const SizedBox(height: 10),
 
-              /// 🔹 Grid الكروت
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: GridView.count(
@@ -132,11 +168,11 @@ class CustomerOfffline extends StatelessWidget {
                   mainAxisSpacing: 16,
                   childAspectRatio: 0.85,
                   children: [
-                    buildCard(context,"Delivery", "images/delivery.jpg"),
-                    buildCard(context,"Education", "images/education.jpg"),
-                    buildCard(context,"Medicine", "images/medcine.jpg"),
-                    buildCard(context,"Home Services", "images/homeservices.jpg"),
-                    buildCard(context,"Others", "images/others.jpg"),
+                    buildCard(context, 1, "Delivery", "images/delivery.jpg"),
+                    buildCard(context, 2, "Education", "images/education.jpg"),
+                    buildCard(context, 3, "Medicine", "images/medcine.jpg"),
+                    buildCard(context, 4, "Home Services", "images/homeservices.jpg"),
+                    buildCard(context, 5, "Others", "images/others.jpg"),
                   ],
                 ),
               ),
@@ -147,14 +183,16 @@ class CustomerOfffline extends StatelessWidget {
     );
   }
 
-  Widget buildCard(BuildContext context, String title, String image) {
+  Widget buildCard(BuildContext context, int id, String title, String image) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => RequestsScreen(
-              serviceType: title,
+              categoryId: id,
+              categoryName: title,
+                serviceType: "request"
             ),
           ),
         );
@@ -173,7 +211,6 @@ class CustomerOfffline extends StatelessWidget {
         ),
         child: Column(
           children: [
-            /// الصورة
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
@@ -185,15 +222,11 @@ class CustomerOfffline extends StatelessWidget {
                 fit: BoxFit.cover,
               ),
             ),
-
-            /// النص
             Padding(
               padding: const EdgeInsets.all(10),
               child: Text(
                 title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -201,5 +234,4 @@ class CustomerOfffline extends StatelessWidget {
       ),
     );
   }
-
 }
